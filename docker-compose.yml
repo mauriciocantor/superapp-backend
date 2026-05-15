@@ -27,5 +27,17 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  admin:
+    build: ../superapp-admin
+    container_name: superapp-admin
+    ports:
+      - "3001:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    volumes:
+      - ../superapp-admin:/app
+      - /app/node_modules
+    restart: unless-stopped
+
 volumes:
   postgres_data:

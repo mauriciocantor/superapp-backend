@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const authRouter = require('./auth');
+const registryRouter = require('./registry');
 
 const app = express();
 
@@ -13,6 +14,8 @@ app.use('/auth', authRouter);
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
+
+app.use('/registry', registryRouter);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
