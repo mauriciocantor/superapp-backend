@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const authRouter = require('./auth');
 const registryRouter = require('./registry');
+const path = require('path');
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/registry', registryRouter);
+app.use('/miniapps', express.static(path.join(__dirname, '../public')));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {

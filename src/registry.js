@@ -77,6 +77,18 @@ const miniApps = [
     version: '1.0.0',
     category: 'transport',
   },
+  {
+    id: 'com.superapp.delivery.real',
+    name: 'Delivery Real',
+    description: 'Pide comida a domicilio',
+    icon_url: '',
+    color: 0x009688,
+    enabled: true,
+    permissions: ['location'],
+    bundle_url: '',
+    version: '1.0.0',
+    category: 'food',
+  }
 ];
 
 // Middleware para verificar token
