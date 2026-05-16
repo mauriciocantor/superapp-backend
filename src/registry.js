@@ -84,8 +84,8 @@ const miniApps = [
     icon_url: '',
     color: 0x009688,
     enabled: true,
-    permissions: ['location'],
-    bundle_url: '',
+    permissions: ['location', 'payments'],
+    bundle_url: 'http://192.168.20.162:3000/miniapps/miniapp-delivery/index.html',
     version: '1.0.0',
     category: 'food',
   }
