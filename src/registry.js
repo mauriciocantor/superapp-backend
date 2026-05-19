@@ -130,7 +130,6 @@ router.put('/:id', authMiddleware, async (req, res) => {
           bundle_url,
           req.user.email,
           version?.substring(0, 7) || 'manual',
-          true,
         ]
       );
     }
