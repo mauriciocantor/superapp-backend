@@ -43,6 +43,20 @@ router.get('/:id', authMiddleware, async (req, res) => {
   }
 });
 
+router.get('/admin/all', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Solo administradores' });
+  }
+  try {
+    const result = await pool.query(
+      'SELECT * FROM mini_apps ORDER BY created_at ASC'
+    );
+    res.json({ apps: result.rows, total: result.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
 // POST /registry
 router.post('/', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') {

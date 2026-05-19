@@ -33,7 +33,7 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=https://superapp-backend-grtx.onrender.com
     volumes:
       - ../superapp-admin:/app
       - /app/node_modules
