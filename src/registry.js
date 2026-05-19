@@ -137,4 +137,21 @@ router.put('/:id/toggle', authMiddleware, (req, res) => {
   res.json({ id: app.id, enabled: app.enabled });
 });
 
+// PUT /registry/:id — actualizar version y bundle_url (CI/CD)
+router.put('/:id', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Solo administradores' });
+  }
+  const app = miniApps.find(a => a.id === req.params.id);
+  if (!app) return res.status(404).json({ error: 'Mini-app no encontrada' });
+
+  // Actualizar solo los campos que vienen en el body
+  if (req.body.version)    app.version    = req.body.version;
+  if (req.body.bundle_url) app.bundle_url = req.body.bundle_url;
+  if (req.body.name)       app.name       = req.body.name;
+
+  console.log(`[Registry] ${app.id} actualizada a v${app.version}`);
+  res.json(app);
+});
+
 module.exports = router;
