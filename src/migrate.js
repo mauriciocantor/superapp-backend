@@ -31,10 +31,24 @@ async function migrate() {
         enabled BOOLEAN DEFAULT true,
         permissions TEXT[] DEFAULT '{}',
         bundle_url VARCHAR(500),
-        version VARCHAR(20) DEFAULT '1.0.0',
+        version VARCHAR(50) DEFAULT '1.0.0',
         category VARCHAR(50) DEFAULT 'other',
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Tabla de historial de versiones
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS mini_app_versions (
+        id SERIAL PRIMARY KEY,
+        app_id VARCHAR(100) REFERENCES mini_apps(id),
+        version VARCHAR(50) NOT NULL,
+        bundle_url VARCHAR(500),
+        deployed_at TIMESTAMP DEFAULT NOW(),
+        deployed_by VARCHAR(100),
+        commit_sha VARCHAR(50),
+        is_active BOOLEAN DEFAULT false
       );
     `);
 
