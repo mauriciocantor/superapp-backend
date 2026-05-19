@@ -1,97 +1,8 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const pool = require('./db');
 const router = express.Router();
 
-// Base de datos simulada de mini-apps
-// En producción esto viene de PostgreSQL
-const miniApps = [
-  {
-    id: 'com.superapp.delivery',
-    name: 'Delivery',
-    description: 'Pide comida',
-    icon_url: '',
-    color: 0xFF5722,
-    enabled: true,
-    permissions: ['location'],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'food',
-  },
-  {
-    id: 'com.superapp.pagos',
-    name: 'Pagos',
-    description: 'Sin comisión',
-    icon_url: '',
-    color: 0x4CAF50,
-    enabled: true,
-    permissions: ['payments'],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'finance',
-  },
-  {
-    id: 'com.superapp.tienda',
-    name: 'Tienda',
-    description: 'Catálogo',
-    icon_url: '',
-    color: 0x2196F3,
-    enabled: true,
-    permissions: [],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'shopping',
-  },
-  {
-    id: 'com.superapp.salud',
-    name: 'Salud',
-    description: 'Citas médicas',
-    icon_url: '',
-    color: 0xE91E63,
-    enabled: true,
-    permissions: [],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'health',
-  },
-  {
-    id: 'com.superapp.wallet',
-    name: 'Wallet',
-    description: 'Tu saldo',
-    icon_url: '',
-    color: 0x9C27B0,
-    enabled: true,
-    permissions: ['payments'],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'finance',
-  },
-  {
-    id: 'com.superapp.viajes',
-    name: 'Viajes',
-    description: 'Pide un carro',
-    icon_url: '',
-    color: 0x009688,
-    enabled: true,
-    permissions: ['location'],
-    bundle_url: '',
-    version: '1.0.0',
-    category: 'transport',
-  },
-  {
-    id: 'com.superapp.delivery.real',
-    name: 'Delivery Real',
-    description: 'Pide comida a domicilio',
-    icon_url: '',
-    color: 0x009688,
-    enabled: true,
-    permissions: ['location', 'payments'],
-    bundle_url: 'http://192.168.20.163:3000/miniapps/miniapp-delivery/index.html',
-    version: '1.0.0',
-    category: 'food',
-  }
-];
-
-// Middleware para verificar token
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token requerido' });
@@ -103,55 +14,113 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// GET /registry — devuelve todas las mini-apps activas
-router.get('/', authMiddleware, (req, res) => {
-  const apps = miniApps.filter(app => app.enabled);
-  res.json({ apps, total: apps.length });
+// GET /registry
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM mini_apps WHERE enabled = true ORDER BY created_at ASC'
+    );
+    res.json({ apps: result.rows, total: result.rows.length });
+  } catch (err) {
+    console.error('Registry error:', err.message);
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
-// GET /registry/:id — detalle de una mini-app
-router.get('/:id', authMiddleware, (req, res) => {
-  const app = miniApps.find(a => a.id === req.params.id);
-  if (!app) return res.status(404).json({ error: 'Mini-app no encontrada' });
-  res.json(app);
+// GET /registry/:id
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM mini_apps WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mini-app no encontrada' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
-// POST /registry — agregar nueva mini-app (solo admin)
-router.post('/', authMiddleware, (req, res) => {
+// POST /registry
+router.post('/', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administradores' });
   }
-  const newApp = { ...req.body, enabled: true };
-  miniApps.push(newApp);
-  res.status(201).json(newApp);
+  try {
+    const {
+      id, name, description, icon_url,
+      color, permissions, bundle_url, version, category
+    } = req.body;
+
+    const result = await pool.query(
+      `INSERT INTO mini_apps 
+        (id, name, description, icon_url, color, permissions, bundle_url, version, category)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
+      [id, name, description, icon_url || '',
+       color || 7103231, permissions || [],
+       bundle_url || '', version || '1.0.0', category || 'other']
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error('Create app error:', err.message);
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
-// PUT /registry/:id/toggle — activar o desactivar
-router.put('/:id/toggle', authMiddleware, (req, res) => {
+// PUT /registry/:id/toggle
+router.put('/:id/toggle', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administradores' });
   }
-  const app = miniApps.find(a => a.id === req.params.id);
-  if (!app) return res.status(404).json({ error: 'Mini-app no encontrada' });
-  app.enabled = !app.enabled;
-  res.json({ id: app.id, enabled: app.enabled });
+  try {
+    const result = await pool.query(
+      `UPDATE mini_apps SET enabled = NOT enabled, updated_at = NOW()
+       WHERE id = $1 RETURNING id, enabled`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mini-app no encontrada' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
-// PUT /registry/:id — actualizar version y bundle_url (CI/CD)
-router.put('/:id', authMiddleware, (req, res) => {
+// PUT /registry/:id
+router.put('/:id', authMiddleware, async (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administradores' });
   }
-  const app = miniApps.find(a => a.id === req.params.id);
-  if (!app) return res.status(404).json({ error: 'Mini-app no encontrada' });
+  try {
+    const { version, bundle_url, name, enabled, permissions } = req.body;
 
-  // Actualizar solo los campos que vienen en el body
-  if (req.body.version)    app.version    = req.body.version;
-  if (req.body.bundle_url) app.bundle_url = req.body.bundle_url;
-  if (req.body.name)       app.name       = req.body.name;
+    const result = await pool.query(
+      `UPDATE mini_apps SET
+        version    = COALESCE($1, version),
+        bundle_url = COALESCE($2, bundle_url),
+        name       = COALESCE($3, name),
+        enabled    = COALESCE($4, enabled),
+        permissions = COALESCE($5, permissions),
+        updated_at = NOW()
+       WHERE id = $6
+       RETURNING *`,
+      [version, bundle_url, name, enabled, permissions, req.params.id]
+    );
 
-  console.log(`[Registry] ${app.id} actualizada a v${app.version}`);
-  res.json(app);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Mini-app no encontrada' });
+    }
+
+    console.log(`[Registry] ${req.params.id} actualizada`);
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Update error:', err.message);
+    res.status(500).json({ error: 'Error interno' });
+  }
 });
 
 module.exports = router;
