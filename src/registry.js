@@ -137,15 +137,14 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
     const result = await pool.query(
       `UPDATE mini_apps SET
-        version    = COALESCE($1, version),
-        bundle_url = COALESCE($2, bundle_url),
-        name       = COALESCE($3, name),
-        enabled    = COALESCE($4, enabled),
-        permissions = COALESCE($5, permissions),
-        updated_at = NOW()
-       WHERE id = $6
-       RETURNING *`,
-      [version, bundle_url, name, enabled, permissions, req.params.id]
+        version     = COALESCE($1, version),
+        bundle_url  = COALESCE($2, bundle_url),
+        name        = COALESCE($3, name),
+        enabled     = COALESCE($4, enabled),
+        updated_at  = NOW()
+      WHERE id = $5
+      RETURNING *`,
+      [version, bundle_url, name, enabled, req.params.id]
     );
 
     if (result.rows.length === 0) {
