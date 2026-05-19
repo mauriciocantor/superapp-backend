@@ -98,6 +98,29 @@ router.put('/:id', authMiddleware, async (req, res) => {
   try {
     const { version, bundle_url, name, enabled, permissions } = req.body;
 
+    // Desactivar versión anterior en el historial
+    if (bundle_url) {
+      await pool.query(
+        'UPDATE mini_app_versions SET is_active = false WHERE app_id = $1',
+        [req.params.id]
+      );
+
+      // Guardar nueva versión en historial
+      await pool.query(
+        `INSERT INTO mini_app_versions 
+          (app_id, version, bundle_url, deployed_by, commit_sha, is_active)
+         VALUES ($1, $2, $3, $4, $5, true)`,
+        [
+          req.params.id,
+          version || '1.0.0',
+          bundle_url,
+          req.user.email,
+          version?.substring(0, 7) || 'manual',
+          true,
+        ]
+      );
+    }
+
     const result = await pool.query(
       `UPDATE mini_apps SET
         version    = COALESCE($1, version),
@@ -115,10 +138,71 @@ router.put('/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Mini-app no encontrada' });
     }
 
-    console.log(`[Registry] ${req.params.id} actualizada`);
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Update error:', err.message);
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// GET /registry/:id/versions — historial de versiones
+router.get('/:id/versions', authMiddleware, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM mini_app_versions 
+       WHERE app_id = $1 
+       ORDER BY deployed_at DESC 
+       LIMIT 10`,
+      [req.params.id]
+    );
+    res.json({ versions: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'Error interno' });
+  }
+});
+
+// POST /registry/:id/rollback/:versionId — revertir versión
+router.post('/:id/rollback/:versionId', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Solo administradores' });
+  }
+  try {
+    // Obtener la versión a restaurar
+    const versionResult = await pool.query(
+      'SELECT * FROM mini_app_versions WHERE id = $1 AND app_id = $2',
+      [req.params.versionId, req.params.id]
+    );
+
+    if (versionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Versión no encontrada' });
+    }
+
+    const oldVersion = versionResult.rows[0];
+
+    // Desactivar todas las versiones
+    await pool.query(
+      'UPDATE mini_app_versions SET is_active = false WHERE app_id = $1',
+      [req.params.id]
+    );
+
+    // Activar la versión seleccionada
+    await pool.query(
+      'UPDATE mini_app_versions SET is_active = true WHERE id = $1',
+      [req.params.versionId]
+    );
+
+    // Actualizar la mini-app con la versión anterior
+    const result = await pool.query(
+      `UPDATE mini_apps SET 
+        bundle_url = $1, version = $2, updated_at = NOW()
+       WHERE id = $3 RETURNING *`,
+      [oldVersion.bundle_url, oldVersion.version, req.params.id]
+    );
+
+    console.log(`[Rollback] ${req.params.id} → v${oldVersion.version}`);
+    res.json({ success: true, app: result.rows[0], restored_version: oldVersion });
+  } catch (err) {
+    console.error('Rollback error:', err.message);
     res.status(500).json({ error: 'Error interno' });
   }
 });
